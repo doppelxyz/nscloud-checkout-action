@@ -109,6 +109,15 @@ inputs:
       Abort git HTTP transfers that stall (below ~1 KB/s for 60s), so the inbuilt retry logic kicks in.
     default: "true"
 
+  mirror-refspec:
+    description: >
+      Refspecs to use when fetching into the Git mirror cache. Each refspec
+      should be on a separate line. When not specified, the mirror tracks all
+      refs (the default `git clone --mirror` behavior). Narrowing this to
+      e.g. only branches and tags can significantly speed up the mirror fetch
+      for repositories with many pull requests.
+    default: ""
+
 runs:
   using: node24
   main: dist/index.js
