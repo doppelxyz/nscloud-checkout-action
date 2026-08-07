@@ -31570,6 +31570,14 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
             fs.mkdirSync(mirrorDir, { recursive: true });
             await execWithGitEnv('git', ['clone', '--mirror', '--', remoteURL, mirrorDir], config.maxAttempts);
         }
+        // Allow fetching a commit by SHA that isn't currently a ref tip in the
+        // mirror (e.g. a PR merge commit that's since been superseded, but is
+        // still reachable from mirrored history). Without this, a local fetch by
+        // SHA from the mirror is rejected and always falls back to origin even
+        // when the mirror already has the object. Set unconditionally (cheap, a
+        // local config write) so mirrors cached from before this change pick it
+        // up too.
+        await execWithGitEnv('git', ['--git-dir', mirrorDir, 'config', 'uploadpack.allowReachableSHA1InWant', 'true'], 1);
         // Fetch commits for mirror
         const mirrorFetchArgs = ['-c', 'protocol.version=2', '--git-dir', mirrorDir, 'fetch', '--no-recurse-submodules', '--prune'];
         if (config.mirrorRefspec.length === 0 || config.mirrorRefspec.some(rs => rs.includes('refs/tags/'))) {
@@ -31869,6 +31877,14 @@ async function getCheckoutInfo(ref, commit, depth, mirrorDir) {
         core.debug(`Detected fully-qualified ref ${ref}`);
     }
     const result = {};
+    // Whether to fetch by the exact commit (default) or by the live ref tip.
+    // Pull ref tips (e.g. refs/pull/41900/merge) are recomputed by GitHub
+    // whenever the base branch moves, so the event's SHA can go stale/
+    // unreachable by the time this job's mirror sync runs. Resolve those via
+    // the ref we just synced into the mirror instead of the possibly-diverged
+    // event SHA. Branches and tags keep pinning to the exact commit, since
+    // that's the specific point in history the workflow run is expected to see.
+    let preferRefOverCommit = false;
     // refs/heads/
     const upperRef = ref.toUpperCase();
     if (upperRef.startsWith('REFS/HEADS/')) {
@@ -31884,6 +31900,7 @@ async function getCheckoutInfo(ref, commit, depth, mirrorDir) {
         const branch = ref.substring('refs/pull/'.length);
         result.originalRef = ref;
         result.pointerRef = `refs/remotes/pull/${branch}`;
+        preferRefOverCommit = true;
     }
     // all other, mostly tags - mirror
     else if (ref) {
@@ -31897,10 +31914,11 @@ async function getCheckoutInfo(ref, commit, depth, mirrorDir) {
         result.originalRef = commit;
         result.pointerRef = commit;
     }
+    const fetchSource = preferRefOverCommit ? ref || commit : commit || ref;
     if (depth > 0) {
         // Only fetch the requested ref
         if (ref) {
-            result.fetchRefs = [`+${commit || ref}:${result.pointerRef}`];
+            result.fetchRefs = [`+${fetchSource}:${result.pointerRef}`];
         }
         else {
             result.fetchRefs = [commit];
@@ -31909,7 +31927,7 @@ async function getCheckoutInfo(ref, commit, depth, mirrorDir) {
     else {
         result.fetchRefs = ['+refs/heads/*:refs/remotes/origin/*', '+refs/tags/*:refs/tags/*'];
         if (ref && !upperRef.startsWith('REFS/HEADS/') && !upperRef.startsWith('REFS/TAGS/')) {
-            result.fetchRefs.push(`+${commit || ref}:${result.pointerRef}`);
+            result.fetchRefs.push(`+${fetchSource}:${result.pointerRef}`);
         }
         else if (!ref && commit) {
             // Explicitly fetch the commit when only a SHA was provided
