@@ -31608,25 +31608,57 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
             await execWithGitEnv('git', [...gitRepoFlags, 'config', 'lfs.storage', mirrorLFSStorage], 1);
         }
         // Fetch the refs.
-        // Prefer fetching directly from the local mirror: the mirror update above
-        // already synced the refs we need, so a local fetch just links in objects
-        // that are already on disk (visible via the alternates below) instead of
-        // renegotiating and re-transferring them over the network. Only fall back
-        // to origin when the mirror doesn't have what we asked for (e.g. a commit
-        // that's no longer reachable from any ref, such as an orphaned commit or
-        // a deleted PR, or a ref excluded by a narrowed mirror-refspec).
+        //
+        // Fast path: when a single exact ref/commit is requested (fetch-depth > 0
+        // always resolves to exactly one target, never a wildcard refspec) and
+        // the mirror already has that commit, skip running `git fetch` at all.
+        // Objects are visible through the alternates below, so we only need to
+        // point the local ref at the resolved SHA (or, for a bare-commit target,
+        // nothing at all — `git checkout <sha>` works directly against the
+        // alternate object store). This is faster than even a local `git fetch`,
+        // which still pays for pack negotiation despite transferring nothing.
+        //
+        // Note this intentionally does not create a `.git/shallow` boundary, so
+        // the resulting checkout has the mirror's full history reachable via the
+        // alternates rather than being a true shallow clone, even though
+        // fetch-depth requested one.
+        //
+        // Falls back to a local fetch from the mirror, and then to origin, when
+        // the mirror doesn't have what we asked for (e.g. a commit that's no
+        // longer reachable from any ref, such as an orphaned commit or a deleted
+        // PR, a ref excluded by a narrowed mirror-refspec, or a wildcard refspec
+        // from a full/deep checkout).
         const fetchDepthFlags = config.fetchDepth <= 0 ? [] : ['--depth', config.fetchDepth.toString(), '--no-tags'];
         const filterFlags = config.filter === '' ? [] : ['--filter', config.filter];
         const referenceEnv = {
             GIT_ALTERNATE_OBJECT_DIRECTORIES: path.join(mirrorDir, 'objects')
         };
-        const fetchArgs = [...gitRepoFlags, 'fetch', '-v', '--prune', '--progress', '--no-recurse-submodules', ...fetchDepthFlags, ...filterFlags];
-        try {
-            await execWithGitEnv('git', [...fetchArgs, mirrorDir, ...checkoutInfo.fetchRefs], 1, { env: referenceEnv });
+        let linkedFromMirrorDirectly = false;
+        if (config.fetchDepth > 0) {
+            const soleFetchRef = checkoutInfo.fetchRefs[0];
+            const colonIndex = soleFetchRef.indexOf(':');
+            const target = colonIndex === -1 ? soleFetchRef : soleFetchRef.substring(1, colonIndex);
+            try {
+                const { stdout } = await getExecOutputWithGitEnv('git', ['--git-dir', mirrorDir, 'rev-parse', '--verify', `${target}^{commit}`]);
+                const sha = stdout.trim();
+                if (colonIndex !== -1) {
+                    await execWithGitEnv('git', [...gitRepoFlags, 'update-ref', checkoutInfo.pointerRef, sha], 1, { env: referenceEnv });
+                }
+                linkedFromMirrorDirectly = true;
+            }
+            catch (error) {
+                core.debug(`Mirror doesn't have ${target} directly, falling back to fetch: ${error instanceof Error ? error.message : error}`);
+            }
         }
-        catch (error) {
-            core.debug(`Local fetch from mirror failed, falling back to origin: ${error instanceof Error ? error.message : error}`);
-            await execWithGitEnv('git', [...fetchArgs, 'origin', ...checkoutInfo.fetchRefs], config.maxAttempts, { env: referenceEnv });
+        if (!linkedFromMirrorDirectly) {
+            const fetchArgs = [...gitRepoFlags, 'fetch', '-v', '--prune', '--progress', '--no-recurse-submodules', ...fetchDepthFlags, ...filterFlags];
+            try {
+                await execWithGitEnv('git', [...fetchArgs, mirrorDir, ...checkoutInfo.fetchRefs], 1, { env: referenceEnv });
+            }
+            catch (error) {
+                core.debug(`Local fetch from mirror failed, falling back to origin: ${error instanceof Error ? error.message : error}`);
+                await execWithGitEnv('git', [...fetchArgs, 'origin', ...checkoutInfo.fetchRefs], config.maxAttempts, { env: referenceEnv });
+            }
         }
         core.endGroup();
         // If Git LFS is required, download objects. This should use the mirror cached LFS objects.
