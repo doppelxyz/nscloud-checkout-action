@@ -31607,24 +31607,27 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
             const mirrorLFSStorage = path.join(mirrorDir, 'lfs');
             await execWithGitEnv('git', [...gitRepoFlags, 'config', 'lfs.storage', mirrorLFSStorage], 1);
         }
-        // Fetch the refs
+        // Fetch the refs.
+        // Prefer fetching directly from the local mirror: the mirror update above
+        // already synced the refs we need, so a local fetch just links in objects
+        // that are already on disk (visible via the alternates below) instead of
+        // renegotiating and re-transferring them over the network. Only fall back
+        // to origin when the mirror doesn't have what we asked for (e.g. a commit
+        // that's no longer reachable from any ref, such as an orphaned commit or
+        // a deleted PR, or a ref excluded by a narrowed mirror-refspec).
         const fetchDepthFlags = config.fetchDepth <= 0 ? [] : ['--depth', config.fetchDepth.toString(), '--no-tags'];
         const filterFlags = config.filter === '' ? [] : ['--filter', config.filter];
         const referenceEnv = {
             GIT_ALTERNATE_OBJECT_DIRECTORIES: path.join(mirrorDir, 'objects')
         };
-        await execWithGitEnv('git', [
-            ...gitRepoFlags,
-            'fetch',
-            '-v',
-            '--prune',
-            '--progress',
-            '--no-recurse-submodules',
-            ...fetchDepthFlags,
-            ...filterFlags,
-            'origin',
-            ...checkoutInfo.fetchRefs
-        ], config.maxAttempts, { env: referenceEnv });
+        const fetchArgs = [...gitRepoFlags, 'fetch', '-v', '--prune', '--progress', '--no-recurse-submodules', ...fetchDepthFlags, ...filterFlags];
+        try {
+            await execWithGitEnv('git', [...fetchArgs, mirrorDir, ...checkoutInfo.fetchRefs], 1, { env: referenceEnv });
+        }
+        catch (error) {
+            core.debug(`Local fetch from mirror failed, falling back to origin: ${error instanceof Error ? error.message : error}`);
+            await execWithGitEnv('git', [...fetchArgs, 'origin', ...checkoutInfo.fetchRefs], config.maxAttempts, { env: referenceEnv });
+        }
         core.endGroup();
         // If Git LFS is required, download objects. This should use the mirror cached LFS objects.
         if (config.downloadGitLFS) {
