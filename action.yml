@@ -31,6 +31,14 @@ inputs:
     description: 'Number of commits to fetch. 0 indicates all history for all branches and tags.'
     default: "1"
 
+  skip-tags:
+    description: >
+      When true, pass --no-tags on the workspace fetch from the mirror so git
+      does not auto-follow tags that point at downloaded commits. Shallow
+      checkouts (fetch-depth > 0) already skip tags. Explicit refs/tags/*
+      entries in mirror-refspec are still fetched.
+    default: "false"
+
   persist-credentials:
     description: 'Whether to configure the token or SSH key with the local git config'
     default: "true"

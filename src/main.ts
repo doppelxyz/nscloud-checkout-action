@@ -157,7 +157,15 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
     // longer reachable from any ref, such as an orphaned commit or a deleted
     // PR, a ref excluded by a narrowed mirror-refspec, or a wildcard refspec
     // from a full/deep checkout).
-    const fetchDepthFlags = config.fetchDepth <= 0 ? [] : ['--depth', config.fetchDepth.toString(), '--no-tags']
+    const fetchDepthFlags: string[] = []
+    if (config.fetchDepth > 0) {
+      fetchDepthFlags.push('--depth', config.fetchDepth.toString())
+    }
+    // Shallow fetches already omit tags; skip-tags also disables tag-following
+    // on full-history fetches (otherwise tags pointing at fetched commits appear).
+    if (config.fetchDepth > 0 || config.skipTags) {
+      fetchDepthFlags.push('--no-tags')
+    }
     const filterFlags = config.filter === '' ? [] : ['--filter', config.filter]
     const referenceEnv = {
       GIT_ALTERNATE_OBJECT_DIRECTORIES: path.join(mirrorDir, 'objects')
@@ -289,6 +297,7 @@ interface IInputConfig {
   trace: boolean
   cancelStallingGitOperations: boolean
   mirrorRefspec: string[]
+  skipTags: boolean
 }
 
 function parseInputConfig(): IInputConfig {
@@ -419,6 +428,9 @@ function parseInputConfig(): IInputConfig {
         .filter(s => s.length > 0)
     : []
   core.debug(`mirrorRefspec = ${JSON.stringify(result.mirrorRefspec)}`)
+
+  result.skipTags = core.getInput('skip-tags').toUpperCase() === 'TRUE'
+  core.debug(`skipTags = ${result.skipTags}`)
 
   return result
 }
