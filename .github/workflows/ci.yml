@@ -14,9 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
           cache: 'npm'
@@ -46,9 +46,9 @@ jobs:
 
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Github checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: github-current
           ref: ${{ matrix.ref }}
@@ -67,7 +67,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Basic checkout tests
         uses: ./
         with:
@@ -82,7 +82,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout side by side 1
         uses: ./
         with:
@@ -114,7 +114,7 @@ jobs:
       - nscloud-git-mirror-5gb
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout LFS (mode=${{ matrix.lfs-mode }})
         uses: ./
         with:
@@ -132,7 +132,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: First checkout (warms mirror LFS cache with normal network)
         uses: ./
         with:
@@ -163,7 +163,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout with lfs-mode=skip-cache
         uses: ./
         with:
@@ -218,7 +218,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout LFS with bogus mode
         uses: ./
         with:
@@ -244,7 +244,7 @@ jobs:
           - recursive
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout submodules=${{ matrix.variant }}
         uses: ./
         with:
@@ -259,7 +259,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Namespace Checkout
         uses: ./
         with:
@@ -284,7 +284,7 @@ jobs:
           - true
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Check out main
         uses: ./
         with:
@@ -311,7 +311,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout with tracing
         uses: ./
         with:
@@ -329,7 +329,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout orphaned commit by SHA
         uses: ./
         with:
@@ -353,9 +353,9 @@ jobs:
           - false
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Github sparse checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           path: github-sparse
           sparse-checkout: |
@@ -386,7 +386,7 @@ jobs:
       - name: Install git
         run: apt-get update && apt-get install -y git
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
       - name: Checkout in container
         uses: ./
         with:
@@ -411,7 +411,7 @@ jobs:
     runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
     steps:
       - name: Check out action
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       # Run checkout as the runner user (uid 1001) — should use v2/<repo> path.
       - name: Checkout as runner
@@ -442,3 +442,37 @@ jobs:
             echo "ERROR: uid 1001 should not have uid in cache path"
             exit 1
           fi
+
+  mirror-refspec:
+    name: Mirror with custom refspec
+    runs-on: [nscloud-ubuntu-22.04-amd64-2x4-with-cache, nscloud-git-mirror-5gb]
+    strategy:
+      fail-fast: false
+      matrix:
+        ref:
+          - ""
+          - "main"
+          - "refs/tags/v7.1.0"
+        fetch-depth:
+          - 0
+          - 1
+    steps:
+      - name: Check out action
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Github checkout (reference)
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: github-ref
+          ref: ${{ matrix.ref }}
+          fetch-depth: ${{ matrix.fetch-depth }}
+      - name: Namespace checkout with mirror-refspec
+        uses: ./
+        with:
+          path: nscloud-refspec
+          ref: ${{ matrix.ref }}
+          fetch-depth: ${{ matrix.fetch-depth }}
+          mirror-refspec: |
+            +refs/heads/*:refs/heads/*
+            +refs/tags/*:refs/tags/*
+      - name: Compare checkouts
+        run: .github/tests/compare-checkouts.sh github-ref nscloud-refspec dist/index.js
