@@ -116,6 +116,12 @@ inputs:
       refs (the default `git clone --mirror` behavior). Narrowing this to
       e.g. only branches and tags can significantly speed up the mirror fetch
       for repositories with many pull requests.
+
+
+      When fetch-depth is 0, a non-empty mirror-refspec also narrows the
+      workspace fetch from the mirror (instead of the default
+      +refs/heads/* and +refs/tags/*). Each heads/pull refspec is mapped to
+      the matching refs/remotes/... pointer used by checkout.
     default: ""
 
 runs:

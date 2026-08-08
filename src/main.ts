@@ -94,7 +94,13 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
     await execWithGitEnv('git', mirrorFetchArgs, config.maxAttempts)
 
     // Resolve references against the mirror
-    const checkoutInfo = await getCheckoutInfo(config.ref, config.commit, config.fetchDepth, mirrorDir)
+    const checkoutInfo = await getCheckoutInfo(
+      config.ref,
+      config.commit,
+      config.fetchDepth,
+      mirrorDir,
+      config.mirrorRefspec
+    )
 
     if (config.downloadGitLFS && usesMirrorLFSCache(config.lfsMode)) {
       const mirrorLFSArgs = buildMirrorLFSArgs(mirrorDir, config.lfsMode, checkoutInfo.originalRef)
@@ -424,7 +430,37 @@ interface ICheckoutInfo {
   fetchRefs: string[]
 }
 
-async function getCheckoutInfo(ref: string, commit: string, depth: number, mirrorDir: string): Promise<ICheckoutInfo> {
+/** Map a mirror-side refspec (+src:dst) to a workspace fetch into refs/remotes/... */
+function mirrorRefspecToWorkspaceFetchRef(refspec: string): string {
+  const forced = refspec.startsWith('+')
+  const body = forced ? refspec.slice(1) : refspec
+  const colon = body.indexOf(':')
+  if (colon === -1) {
+    return refspec
+  }
+
+  const src = body.slice(0, colon)
+  let dst: string
+  if (src.startsWith('refs/heads/')) {
+    dst = `refs/remotes/origin/${src.slice('refs/heads/'.length)}`
+  } else if (src.startsWith('refs/pull/')) {
+    dst = `refs/remotes/pull/${src.slice('refs/pull/'.length)}`
+  } else if (src.startsWith('refs/tags/')) {
+    dst = src
+  } else {
+    dst = body.slice(colon + 1)
+  }
+
+  return `${forced ? '+' : ''}${src}:${dst}`
+}
+
+async function getCheckoutInfo(
+  ref: string,
+  commit: string,
+  depth: number,
+  mirrorDir: string,
+  mirrorRefspec: string[] = []
+): Promise<ICheckoutInfo> {
   // Nothing specified => find the default branch and use it as `ref`.
   if (!ref && !commit) {
     core.debug('No ref or commit => determine default branch')
@@ -491,6 +527,19 @@ async function getCheckoutInfo(ref: string, commit: string, depth: number, mirro
       result.fetchRefs = [`+${fetchSource}:${result.pointerRef}`]
     } else {
       result.fetchRefs = [commit]
+    }
+  } else if (mirrorRefspec.length > 0) {
+    // Narrowed mirror sync: only materialize those refs in the workspace.
+    // Without this, fetch-depth: 0 hardcodes +refs/heads/* and pulls every
+    // tip already present in the warm mirror volume.
+    result.fetchRefs = mirrorRefspec.map(mirrorRefspecToWorkspaceFetchRef)
+    if (ref && !upperRef.startsWith('REFS/HEADS/') && !upperRef.startsWith('REFS/TAGS/')) {
+      const extra = `+${fetchSource}:${result.pointerRef}`
+      if (!result.fetchRefs.includes(extra)) {
+        result.fetchRefs.push(extra)
+      }
+    } else if (!ref && commit) {
+      result.fetchRefs.push(commit)
     }
   } else {
     result.fetchRefs = ['+refs/heads/*:refs/remotes/origin/*', '+refs/tags/*:refs/tags/*']
