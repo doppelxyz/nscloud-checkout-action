@@ -71,7 +71,18 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
     core.debug(`Mirror dir: ${mirrorDir}`)
     if (!fs.existsSync(mirrorDir)) {
       fs.mkdirSync(mirrorDir, { recursive: true })
-      await execWithGitEnv('git', ['clone', '--mirror', '--', remoteURL, mirrorDir], config.maxAttempts)
+      if (config.mirrorRefspec.length > 0) {
+        // Narrowed cold clone. A full `git clone --mirror` pulls every ref and
+        // all history; for a large monorepo that can be many GB, which is both
+        // slow on a cold cache and may not fit / persist in the git-mirror
+        // volume (forcing a re-clone every run). When mirror-refspec is set the
+        // caller only wants a handful of refs, so init a bare repo and let the
+        // incremental fetch below populate it with the requested refspec only.
+        await execWithGitEnv('git', ['init', '--bare', mirrorDir], 1)
+        await execWithGitEnv('git', ['--git-dir', mirrorDir, 'remote', 'add', 'origin', remoteURL], 1)
+      } else {
+        await execWithGitEnv('git', ['clone', '--mirror', '--', remoteURL, mirrorDir], config.maxAttempts)
+      }
     }
 
     // Allow fetching a commit by SHA that isn't currently a ref tip in the
@@ -94,13 +105,7 @@ See also https://namespace.so/docs/solutions/github-actions/caching#git-checkout
     await execWithGitEnv('git', mirrorFetchArgs, config.maxAttempts)
 
     // Resolve references against the mirror
-    const checkoutInfo = await getCheckoutInfo(
-      config.ref,
-      config.commit,
-      config.fetchDepth,
-      mirrorDir,
-      config.mirrorRefspec
-    )
+    const checkoutInfo = await getCheckoutInfo(config.ref, config.commit, config.fetchDepth, mirrorDir, config.mirrorRefspec)
 
     if (config.downloadGitLFS && usesMirrorLFSCache(config.lfsMode)) {
       const mirrorLFSArgs = buildMirrorLFSArgs(mirrorDir, config.lfsMode, checkoutInfo.originalRef)
@@ -466,13 +471,7 @@ function mirrorRefspecToWorkspaceFetchRef(refspec: string): string {
   return `${forced ? '+' : ''}${src}:${dst}`
 }
 
-async function getCheckoutInfo(
-  ref: string,
-  commit: string,
-  depth: number,
-  mirrorDir: string,
-  mirrorRefspec: string[] = []
-): Promise<ICheckoutInfo> {
+async function getCheckoutInfo(ref: string, commit: string, depth: number, mirrorDir: string, mirrorRefspec: string[] = []): Promise<ICheckoutInfo> {
   // Nothing specified => find the default branch and use it as `ref`.
   if (!ref && !commit) {
     core.debug('No ref or commit => determine default branch')
